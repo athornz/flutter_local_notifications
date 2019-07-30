@@ -91,10 +91,6 @@ typedef NS_ENUM(NSInteger, RepeatInterval) {
         appResumingFromBackground = YES;
         
         persistentState = [NSUserDefaults standardUserDefaults];
-        if(@available(iOS 10.0, *)) {
-            UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
-            center.delegate = self;
-        }
     }
     return self;
 }
