@@ -11,7 +11,6 @@
     bool playSound;
     bool updateBadge;
     bool initialized;
-    bool launchingAppFromNotification;
     NSUserDefaults *persistentState;
     NSObject<FlutterPluginRegistrar> *_registrar;
     
@@ -63,6 +62,7 @@ NSString *const PAYLOAD = @"payload";
 NSString *const DATA = @"data";
 NSString *const NOTIFICATION_LAUNCHED_APP = @"notificationLaunchedApp";
 
+bool launchingAppFromNotification;
 NSDictionary *launchNotification;
 
 typedef NS_ENUM(NSInteger, RepeatInterval) {
@@ -489,7 +489,9 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
         }
         
     }
+    completionHandler();
 }
+
 - (BOOL)application:(UIApplication *)application
 didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
     if (launchOptions != nil) {
