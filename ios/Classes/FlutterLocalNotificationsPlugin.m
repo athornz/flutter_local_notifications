@@ -13,7 +13,8 @@
     bool initialized;
     NSUserDefaults *persistentState;
     NSObject<FlutterPluginRegistrar> *_registrar;
-    
+	bool launchingAppFromNotification;
+	NSDictionary *launchNotification;
 }
 
 NSString *const INITIALIZE_METHOD = @"initialize";
@@ -61,9 +62,6 @@ NSString *const NOTIFICATION_ID = @"NotificationId";
 NSString *const PAYLOAD = @"payload";
 NSString *const DATA = @"data";
 NSString *const NOTIFICATION_LAUNCHED_APP = @"notificationLaunchedApp";
-
-bool launchingAppFromNotification;
-NSDictionary *launchNotification;
 
 typedef NS_ENUM(NSInteger, RepeatInterval) {
     EveryMinute,
@@ -158,6 +156,8 @@ typedef NS_ENUM(NSInteger, RepeatInterval) {
     }*/
     if(@available(iOS 10.0, *)) {
         UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+        center.delegate = self;
+        
         UNAuthorizationOptions authorizationOptions = 0;
         if (requestedSoundPermission) {
             authorizationOptions += UNAuthorizationOptionSound;
