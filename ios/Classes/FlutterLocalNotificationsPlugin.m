@@ -2,11 +2,21 @@
 #import "NotificationTime.h"
 #import "NotificationDetails.h"
 
-static bool appResumingFromBackground;
 
-@implementation FlutterLocalNotificationsPlugin
 
-FlutterMethodChannel* channel;
+@implementation FlutterLocalNotificationsPlugin{
+    FlutterMethodChannel* _channel;
+    bool appResumingFromBackground;
+    bool displayAlert;
+    bool playSound;
+    bool updateBadge;
+    bool initialized;
+    bool launchingAppFromNotification;
+    NSUserDefaults *persistentState;
+    NSObject<FlutterPluginRegistrar> *_registrar;
+    
+}
+
 NSString *const INITIALIZE_METHOD = @"initialize";
 NSString *const INITIALIZED_HEADLESS_SERVICE_METHOD = @"initializedHeadlessService";
 NSString *const SHOW_METHOD = @"show";
@@ -53,15 +63,6 @@ NSString *const PAYLOAD = @"payload";
 NSString *const DATA = @"data";
 NSString *const NOTIFICATION_LAUNCHED_APP = @"notificationLaunchedApp";
 
-bool displayAlert;
-bool playSound;
-bool updateBadge;
-bool initialized;
-bool launchingAppFromNotification;
-NSUserDefaults *persistentState;
-NSObject<FlutterPluginRegistrar> *_registrar;
-
-+ (bool) resumingFromBackground { return appResumingFromBackground; }
 NSDictionary *launchNotification;
 
 typedef NS_ENUM(NSInteger, RepeatInterval) {
@@ -71,20 +72,31 @@ typedef NS_ENUM(NSInteger, RepeatInterval) {
     Weekly
 };
 
-
 + (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar>*)registrar {
-    channel = [FlutterMethodChannel
+    FlutterMethodChannel *channel = [FlutterMethodChannel
                methodChannelWithName:CHANNEL
                binaryMessenger:[registrar messenger]];
-    persistentState = [NSUserDefaults standardUserDefaults];
-    FlutterLocalNotificationsPlugin* instance = [[FlutterLocalNotificationsPlugin alloc] init];
-    if(@available(iOS 10.0, *)) {
-        UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
-        center.delegate = instance;
-    }
+   
+    FlutterLocalNotificationsPlugin* instance = [[FlutterLocalNotificationsPlugin alloc] initWithChannel:channel registrar:registrar];
     [registrar addApplicationDelegate:instance];
     [registrar addMethodCallDelegate:instance channel:channel];
-    _registrar = registrar;
+}
+
+- (instancetype)initWithChannel:(FlutterMethodChannel *)channel registrar:(NSObject<FlutterPluginRegistrar> *)registrar {
+    self = [super init];
+    
+    if (self) {
+        _channel = channel;
+        _registrar = registrar;
+        appResumingFromBackground = YES;
+        
+        persistentState = [NSUserDefaults standardUserDefaults];
+        if(@available(iOS 10.0, *)) {
+            UNUserNotificationCenter *center = [UNUserNotificationCenter currentNotificationCenter];
+            center.delegate = self;
+        }
+    }
+    return self;
 }
 
 - (void)pendingNotificationRequests:(FlutterResult _Nonnull)result {
@@ -162,7 +174,7 @@ typedef NS_ENUM(NSInteger, RepeatInterval) {
         }
         [center requestAuthorizationWithOptions:(authorizationOptions) completionHandler:^(BOOL granted, NSError * _Nullable error) {
             if(launchNotification != nil) {
-                [channel invokeMethod:@"selectNotification" arguments:launchNotification];
+                [self handleSelectNotification:launchNotification];
             }
             result(@(granted));
         }];
@@ -180,7 +192,7 @@ typedef NS_ENUM(NSInteger, RepeatInterval) {
         UIUserNotificationSettings *settings = [UIUserNotificationSettings settingsForTypes:notificationTypes categories:nil];
         [[UIApplication sharedApplication] registerUserNotificationSettings:settings];
         if(launchNotification != nil) {
-            [channel invokeMethod:@"selectNotification" arguments:launchNotification];
+            [self handleSelectNotification:launchNotification];
         }
         result(@YES);
     }
@@ -459,8 +471,8 @@ typedef NS_ENUM(NSInteger, RepeatInterval) {
     completionHandler(presentationOptions);
 }
 
-+ (void)handleSelectNotification:(NSDictionary *)data {
-    [channel invokeMethod:@"selectNotification" arguments:data];
+- (void)handleSelectNotification:(NSDictionary *)data {
+    [_channel invokeMethod:@"selectNotification" arguments:data];
 }
 
 - (void)userNotificationCenter:(UNUserNotificationCenter *)center
@@ -470,7 +482,7 @@ didReceiveNotificationResponse:(UNNotificationResponse *)response
         
         NSDictionary *data = response.notification.request.content.userInfo;
         if(initialized) {
-            [FlutterLocalNotificationsPlugin handleSelectNotification:data];
+            [self handleSelectNotification:data];
         } else {
             launchNotification = data;
             launchingAppFromNotification = true;
@@ -500,7 +512,7 @@ didFinishLaunchingWithOptions:(NSDictionary *)launchOptions {
 - (void)application:(UIApplication*)application
 didReceiveLocalNotification:(UILocalNotification*)notification {
     NSDictionary *arguments = [NSDictionary dictionaryWithObjectsAndKeys:notification.userInfo[NOTIFICATION_ID], ID,notification.userInfo[TITLE], TITLE,notification.alertBody, BODY,  notification.userInfo, DATA, nil];
-    [channel invokeMethod:DID_RECEIVE_LOCAL_NOTIFICATION arguments:arguments];
+    [_channel invokeMethod:DID_RECEIVE_LOCAL_NOTIFICATION arguments:arguments];
 }
 
 @end
